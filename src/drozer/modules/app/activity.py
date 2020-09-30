@@ -33,14 +33,14 @@ class ForIntent(Module, common.PackageManager):
                 self.stdout.write("  %s\n\n" % activity_info.name)
         else:
             self.stderr.write("invalid intent: one of action or component must be set\n")
-    
+
     def get_completion_suggestions(self, action, text, **kwargs):
         if action.dest in ["action", "category", "component", "data_uri",
                            "extras", "flags", "mimetype"]:
             return android.Intent.get_completion_suggestions(action, text, **kwargs)
 
 class Info(Module, common.Filters, common.IntentFilter, common.PackageManager):
-    
+
     name = "Gets information about exported activities."
     description = "Gets information about exported activities."
     examples = """List activities exported by the Browser:
@@ -61,9 +61,9 @@ class Info(Module, common.Filters, common.IntentFilter, common.PackageManager):
 
     def add_arguments(self, parser):
         parser.add_argument("-a", "--package", default=None, help="specify the package to inspect")
-        parser.add_argument("-f", "--filter", default=None, help="specify a filter term for the activity name")
+        parser.add_argument("-f", "--filter", default=None, help="specify a filter term for the activity name like: -f \"WbShareTransActivity,WbShareToStoryActivity\"")
         parser.add_argument("-i", "--show-intent-filters", action="store_true", default=False, help="specify whether to include intent filters")
-        parser.add_argument("-u", "--unexported", action="store_true", default=False, help="include activities that are not exported")
+        parser.add_argument("-u", "--unexported", action="store_true", default=True, help="include activities that are not exported")
         parser.add_argument("-v", "--verbose", action="store_true", default=False, help="be verbose")
 
     def execute(self, arguments):
@@ -75,43 +75,52 @@ class Info(Module, common.Filters, common.IntentFilter, common.PackageManager):
 
             self.__get_activities(arguments, package)
 
-    def __get_activities(self, arguments, package):
-        activities = self.match_filter(package.activities, 'name', arguments.filter)
-
+    def __get_activities_byfilter(self, arguments, package, activities):
         exported_activities = self.match_filter(activities, 'exported', True)
         hidden_activities = self.match_filter(activities, 'exported', False)
 
         if len(exported_activities) > 0 or arguments.unexported and len(activities) > 0:
-            self.stdout.write("Package: %s\n" % package.packageName)
-
             if not arguments.unexported:
                 for activity in exported_activities:
                     self.__print_activity(package, activity, "  ", arguments.show_intent_filters)
             else:
-                self.stdout.write("  Exported Activities:\n")
-                for activity in exported_activities:
-                    self.__print_activity(package, activity, "    ", arguments.show_intent_filters)
-                self.stdout.write("  Hidden Activities:\n")
+                if len(hidden_activities) > 0:
+                    self.stdout.write("[-----------------------Hidden Activities:-------------------------]\n")
                 for activity in hidden_activities:
+                    self.__print_activity(package, activity, "    ", arguments.show_intent_filters)
+
+                if len(exported_activities) > 0:
+                    self.stdout.write("[-----------------------Exported Activities:-----------------------]\n")
+                for activity in exported_activities:
                     self.__print_activity(package, activity, "    ", arguments.show_intent_filters)
             self.stdout.write("\n")
         elif arguments.package or arguments.verbose:
             self.stdout.write("Package: %s\n" % package.packageName)
             self.stdout.write("  No matching activities.\n\n")
-    
+
+
+    def __get_activities(self, arguments, package):
+        filter = arguments.filter
+        filters_lists = filter.split(",")
+        self.stdout.write("Package: %s\n" % package.packageName)
+
+        for filter in filters_lists:
+            activities = self.match_filter(package.activities, 'name', filter)
+            self.__get_activities_byfilter(arguments, package, activities)
+
     def __print_activity(self, package, activity, prefix, include_intent_filters):
         self.stdout.write("%s%s\n" % (prefix, activity.name))
-        
+
         if(activity._has_property("parentActivityName") and activity.parentActivityName != None):
             self.stdout.write("%s  Parent Activity: %s\n" % (prefix, activity.parentActivityName))
 
         self.stdout.write("%s  Permission: %s\n" % (prefix, activity.permission))
-        
+
         if(activity.targetActivity != None):
             self.stdout.write("%s  Target Activity: %s\n" % (prefix, activity.targetActivity))
         if include_intent_filters:
             intent_filters = self.find_intent_filters(activity, 'activity')
-            
+
             if len(intent_filters) > 0:
                 for intent_filter in intent_filters:
                     self.stdout.write("%s  Intent Filter:\n" % (prefix))
@@ -127,7 +136,7 @@ class Info(Module, common.Filters, common.IntentFilter, common.PackageManager):
                         self.stdout.write("%s    Data:\n" % (prefix))
                         for data in intent_filter.datas:
                             self.stdout.write("%s      - %s\n" % (prefix, data))
-                
+
 class Start(Module):
 
     name = "Start an Activity"
@@ -138,7 +147,7 @@ class Start(Module):
                 --component com.android.browser
                             com.android.browser.BrowserActivity
                 --flags ACTIVITY_NEW_TASK
-                
+
 If no flags are specified, drozer will add the ACTIVITY_NEW_TASK flag. To launch an activity with no flags:
 
     dz> run app.activity.start
@@ -168,14 +177,13 @@ For more information on how to formulate an Intent, type 'help intents'."""
 
         if len(intent.flags) == 0:
             intent.flags.append('ACTIVITY_NEW_TASK')
-        
+
         if intent.isValid():
             self.getContext().startActivity(intent.buildIn(self))
         else:
             self.stderr.write("invalid intent: one of action or component must be set\n")
-    
+
     def get_completion_suggestions(self, action, text, **kwargs):
         if action.dest in ["action", "category", "component", "data_uri",
                            "extras", "flags", "mimetype"]:
             return android.Intent.get_completion_suggestions(action, text, **kwargs)
-            
