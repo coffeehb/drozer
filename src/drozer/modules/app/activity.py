@@ -101,11 +101,15 @@ class Info(Module, common.Filters, common.IntentFilter, common.PackageManager):
 
     def __get_activities(self, arguments, package):
         filter = arguments.filter
-        filters_lists = filter.split(",")
-        self.stdout.write("Package: %s\n" % package.packageName)
+        if filter:
+            filters_lists = filter.split(",")
+            self.stdout.write("Package: %s\n" % package.packageName)
 
-        for filter in filters_lists:
-            activities = self.match_filter(package.activities, 'name', filter)
+            for filter in filters_lists:
+                activities = self.match_filter(package.activities, 'name', filter)
+                self.__get_activities_byfilter(arguments, package, activities)
+        else:
+            activities = self.match_filter(package.activities, 'name', arguments.filter)
             self.__get_activities_byfilter(arguments, package, activities)
 
     def __print_activity(self, package, activity, prefix, include_intent_filters):
